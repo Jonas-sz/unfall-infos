@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blaulicht News</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--text:#1a1d21;--muted:#6b7280;--accent:#d62828;--border:#e5e7eb}
+  @media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1b1f25;--text:#eceff3;--muted:#9aa3af;--accent:#ff5a5a;--border:#2a2f37}}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:16px;max-width:800px;margin:auto}
+  h1{margin:0 0 12px;font-size:1.4rem}
+  h1 span{color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .chip{padding:6px 12px;border:1px solid var(--border);border-radius:20px;background:var(--card);color:var(--text);cursor:pointer;font-size:.9rem}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)}
+  main{max-width:800px;margin:auto;padding:0 16px 40px}
+  .status{color:var(--muted);font-size:.85rem;margin:8px 0}
+  a.item{display:block;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;text-decoration:none;color:var(--text)}
+  a.item:hover{border-color:var(--accent)}
+  .t{font-weight:600;margin-bottom:4px}
+  .m{color:var(--muted);font-size:.8rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚨 Blaulicht <span>News</span></h1>
+  <div class="chips" id="chips"></div>
+  <input id="q" placeholder="Filter, z. B. Hannover">
+  <div class="status" id="status"></div>
+</header>
+<main id="list"></main>
+<script>
+const TOPICS = ["Überfälle","Unfälle","Einbrüche","Polizei","Feuer"];
+const active = new Set(TOPICS);
+let all = [], updated = null;
+const chipsEl = document.getElementById("chips");
+const listEl = document.getElementById("list");
+const statusEl = document.getElementById("status");
+const qEl = document.getElementById("q");
+
+TOPICS.forEach(k => {
+  const b = document.createElement("button");
+  b.className = "chip on";
+  b.textContent = k;
+  b.onclick = () => { active.has(k) ? active.delete(k) : active.add(k); b.classList.toggle("on"); render(); };
+  chipsEl.appendChild(b);
+});
+qEl.addEventListener("input", render);
+
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function render() {
+  const q = qEl.value.trim().toLowerCase();
+  const rows = all.filter(n => active.has(n.topic) && (!q || (n.title + n.source).toLowerCase().includes(q)));
+  listEl.innerHTML = rows.map(n => `
+    <a class="item" href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">
+      <div class="t">${esc(n.title)}</div>
+      <div class="m">${esc(n.topic)} · ${esc(n.source)} · ${new Date(n.date).toLocaleString("de-DE",{dateStyle:"short",timeStyle:"short"})}</div>
+    </a>`).join("");
+  statusEl.textContent = rows.length ? rows.length + " Meldungen · Stand " + updated : "Keine Treffer.";
+}
+
+async function load() {
+  try {
+    const r = await fetch("news.json?t=" + Date.now());
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    all = d.items;
+    updated = new Date().toLocaleTimeString("de-DE");
+    render();
+  } catch (e) {
+    statusEl.textContent = "news.json fehlt noch – Action einmal manuell starten (Actions → Update news → Run workflow).";
+  }
+}
+load();
+setInterval(load, 5 * 60 * 1000);
+</script>
+</body>
+</html>
